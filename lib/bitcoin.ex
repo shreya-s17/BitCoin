@@ -1,18 +1,7 @@
 defmodule BITCOIN do
-  @moduledoc """
-  Documentation for BITCOIN.
-  """
+  #CoinBase - 1st transaction per block
+  #no inputs only outputs
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> BITCOIN.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
+  #block chain-
+  #timestamping or ordering of transactions to prevent double spending
 end
