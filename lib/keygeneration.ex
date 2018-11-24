@@ -8,7 +8,7 @@ defmodule KEYGENERATION do
     end
     public_key = to_public_key(private_key)
     to_public_hash(public_key)
-    [private_key, public_key]
+    [private_key |> Base.encode16() , public_key |> Base.encode16()]
   end
 
   defp valid?(key) when is_binary(key) do
@@ -35,12 +35,13 @@ defmodule KEYGENERATION do
     public_key
   end
 
-  defp hash(data, algorithm), do: :crypto.hash(algorithm, data)
+  def hash(data, algorithm), do: :crypto.hash(algorithm, data)
 
   def to_public_hash(key) do
     public_hash = key
     |> hash(:sha256)
     |> hash(:ripemd160)
+    |> Base.encode16()
     public_hash
   end
 

@@ -1,5 +1,6 @@
 defmodule MAIN do
-  :ets.new(:publicKeys, [:set, :protected])
+  :ets.new(:table, [:bag, :named_table,:public])
   SSUPERVISOR.start_link(2)
-  TRANSACTION.coinBase()
+  IO.puts "Genservers started"
+  TRANSACTION.transactionChain(2)
 end

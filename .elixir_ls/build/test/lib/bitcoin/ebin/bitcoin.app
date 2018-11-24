@@ -1,8 +1,9 @@
 {application,bitcoin,
              [{applications,[kernel,stdlib,elixir,logger]},
               {description,"bitcoin"},
-              {modules,['Elixir.BITCOIN','Elixir.GENSERVERS',
-                        'Elixir.KEYGENERATION','Elixir.SSUPERVISOR',
-                        'Elixir.TRANSACTION']},
+              {modules,['Elixir.BITCOIN','Elixir.BLOCKCHAIN',
+                        'Elixir.GENSERVERS','Elixir.KEYGENERATION',
+                        'Elixir.SSUPERVISOR','Elixir.TRANSACTION',
+                        'Elixir.WALLETS']},
               {registered,[]},
               {vsn,"0.1.0"}]}.
