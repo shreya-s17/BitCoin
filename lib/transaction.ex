@@ -18,8 +18,8 @@ defmodule TRANSACTION do
       {_, {val}} = x
       val
     end)
-    coinBase(Enum.random(hashList))
-    IO.puts " coinbase done"
+    IO.puts "Starting coinbase"
+    IO.puts "Ending coinbase"
     recursivePropagation(numTxns, hashList)
   end
 
@@ -47,16 +47,19 @@ defmodule TRANSACTION do
     rawTransaction(txs, inputtxId, address2, unspentAmt/2, map)
   end
 
-  def coinBase(output) do
+  def coinBase(output, amount) do
     tx = %TRANSACTION{
-      outputs: [[output, 50]],
+      outputs: [[output, amount]],      # amount to be sent by coinbase transaction
       inputs: [["0", 0]]
     }
     transRef = Enum.reduce(tx.inputs ++ tx.outputs, "", fn [str, int], acc ->
       acc <> str <> Integer.to_string(int)
     end)
     |> KEYGENERATION.hash(:sha256)
-    transRef
+    |> KEYGENERATION.hash(:sha256)
+    |> Base.encode16()
+    map = %{inputTxId: "0", inputPubKey: "0", outpoint: 0, amount: amount, outPubKey: output}
+    {"",transRef, 0, map}
   end
 
   def rawTransaction(inputtx,inputtxId, outPubKey, amount, map) do
@@ -87,21 +90,24 @@ defmodule TRANSACTION do
     <> "01"
     <> publicKey_unhashed
 
+    #transFee = Enum.random(1..5)
+    transFee = 1
     Map.put(map, :numOfInputs, "01")    # number of inputs
     Map.put(map, :inputTxId, inputtxId)   # txid of previous outputs
     Map.put(map, :outpoint, "00000000")     # outpoint of the previous  txn
     Map.put(map, :scriptLen, scriptSignature.length() -1)   # Script String temp
     Map.put(map, :script, scriptSignature)
     Map.put(map, :numOfOutputs, "01")   # number of outputs in txn
-    Map.put(map, :amount, amount - 0.0001)   # amount in hexa -----------------
+    Map.put(map, :amount, amount)   # amount in hexa -----------------
+    Map.put(map, :transFee, transFee)
     Map.put(map, :outPubKeyLen, outPubKey.length())   # Script Sign
     Map.put(map, :outPubKey, outPubKey) # next node's public key
 
     out1 = Map.values(map)
     |> Enum.reduce(fn x, acc-> acc <> x end)
 
-    :ets.insert(:table, {"pendingTxns", {out1 |> KEYGENERATION.hash(:sha256)
-      |> KEYGENERATION.hash(:sha256), map}})
+    :ets.insert(:table, {"pendingTxns", out1 |> KEYGENERATION.hash(:sha256)
+      |> KEYGENERATION.hash(:sha256), transFee, map})
   end
 
   def sign(val, key) do

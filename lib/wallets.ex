@@ -1,17 +1,16 @@
 defmodule WALLETS do
   require GENSERVERS
 
-  def updateUnspentAmount(senderNode) do
-    map = :ets.lookup(:table,"unspentTxns")
-    finalAmount = 0
-    Enum.each(map, fn x ->
-      # fetch the publickey and check if it is equal.
-      #if(recieverPublicKey == senderNode) do # change it using private key
-        #finalAmount += amt
-      #end
-      #GENSERVERS.cast(String.to_atom("h_" <> senderPublicKey), {:updateWallet, amt * -1})
+  def updateUnspentAmount() do
+    list = :ets.lookup(:table,"unspentTxns")
+    Enum.each(list, fn {_,{_,fee,x}} ->
+      ipKey = Map.get(x,:inputPubKey)
+      amt = Map.get(x, :amount)
+      if(ipKey !="0") do
+        GenServer.cast(String.to_atom("h_" <> ipKey), {:updateWallet, (amt + fee)*-1})
+      end
+      GenServer.cast(String.to_atom("h_" <> Map.get(x,:outPubKey)), {:updateWallet, amt})
     end)
-    GenServer.cast(self(), {:updateWallet, finalAmount})
   end
 
   def verify_signature(public_key, msg, signature) do

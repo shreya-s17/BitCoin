@@ -1,7 +1,7 @@
 defmodule BLOCKCHAIN do
 
-  @difficulty_target "8C05F511E5157EB90B77545ACC85055B19EA74B43BD0F1D7A066946F973F87E8"
-  @miningValue "12.5"
+  @difficulty_target "00805F511E5157EB90B7754ACC85055B19EA74B43BD0F1D7A066946F973F87E8"
+  @miningValue 25
   def calculateMerkleRoot(list,i) do
       count = Enum.count(list)
       if(count == 1) do
@@ -25,9 +25,10 @@ defmodule BLOCKCHAIN do
       end
   end
 
-  def getLatestBlock(count) do
-      [{_,prev}]=:ets.lookup(:table,Integer.to_string(count-1))
-      prev
+  def getLatestBlock() do
+      list=:ets.lookup(:table,"Blocks")
+      {_,hash,_,_} = Enum.at(list,-1)
+      hash
   end
 
   def find6digits(number,i) do
@@ -42,7 +43,6 @@ defmodule BLOCKCHAIN do
       number = @difficulty_target
       digit = find6digits(number,0)
       length = String.length(number)
-      IO.puts("a #{inspect digit} #{inspect length}")
       result = if(digit==0 && String.slice(number,0..1)>"7F") do
                   Integer.to_string(div(length+2,2),16) <> "00" <> String.slice(number,0..3)
               else
@@ -51,38 +51,39 @@ defmodule BLOCKCHAIN do
                           else
                               digit
                           end
-                          IO.inspect div(length-digit,2)
                   Integer.to_string(div(length-digit,2),16) <> String.slice(number,digit..digit+5)
               end
       result
   end
 
-  def createCoinbaseTransaction(fees) do
-      IO.puts "hi"
-      :crypto.hash(:sha256,:crypto.hash(:sha256,fees)) |> Base.encode16
+  def createCoinBase(transactionFees) do
+    keys = :ets.lookup(:table,"PublicKeys")
+    list = Enum.map(keys, fn {_,x}->
+              TRANSACTION.coinBase(x, transactionFees)
+            end)
+    list
   end
 
-  def createBlockHeader(transactionList,transactionFees,previousBlock) do
-      newList = [createCoinbaseTransaction(transactionFees)| transactionList]
-      IO.puts "here"
-      merkleRoot =
-      if(Enum.count(newList)==1) do
-          Enum.at(newList,0)
-      else
-          calculateMerkleRoot(newList,0)
-      end
-      IO.inspect merkleRoot
+  def createBlockHeader(miner, transactionList, transactionFees, minerFee, previousBlock) do
+      #change here nultiple coinbase trans for genesis block
+      transList = if(miner == NULL) do
+                      createCoinBase(transactionFees)
+                  else
+                      [TRANSACTION.coinBase(miner,transactionFees+minerFee)| transactionList]
+                  end
+      count = Enum.count(transList)
+      newList = Enum.map(transList, fn {_,x,_,_} -> x end)
+      newTransList = Enum.map(transList, fn x-> Tuple.delete_at(x,0) end)
+      merkleRoot = calculateMerkleRoot(newList,0)
       version =<<1::32>>
       time =  <<System.system_time(:second)::32>>
       nbits = calculateNBits()
-      calculateNonce(merkleRoot,version,previousBlock,time,nbits,0)
+      [calculateNonce(merkleRoot,version,previousBlock,time,nbits,0),previousBlock, count, newTransList]
   end
 
   def calculateNonce(merkleRoot,version,previousBlock,time,nbits,nonce) do
       hashBlock = :crypto.hash(:sha256,version <> previousBlock <> merkleRoot <> time <> nbits <> <<nonce::32>>) |> Base.encode16
       if(String.slice(hashBlock,0..1) != "00" || String.at(hashBlock,2) =="0" || hashBlock > @difficulty_target) do
-          #IO.inspect nonce
-          #IO.inspect hashBlock
           calculateNonce(merkleRoot,version,previousBlock,time,nbits,nonce+1)
       else
           hashBlock
@@ -90,29 +91,33 @@ defmodule BLOCKCHAIN do
   end
 
   def createGenesisBlock() do
-      createBlockHeader([],@miningValue,"0x0000000000000000000000000000000000000000000000000000000000000000")
+      block = createBlockHeader(NULL, [], @miningValue, 0, "0000000000000000000000000000000000000000000000000000000000000000")
+      Enum.each(Enum.at(block,3), fn x -> :ets.insert(:table, {"unspentTxns", x}) end)
+      block
   end
 
-  def validateBlock() do
+  def validateTransaction(tList) do
+     # list = :ets.lookup(:blocks,"unspentTrans")
+      #if(Enum.count(list)>0
+     # && !Enum.any?(list, fn {id,_}-> id==transid end)
+      #&& Enum.count(tList, fn {id,_}-> id==transid end) ==1) do
 
+      #else
+      #    :false
+      #end
+      :true
   end
 
-  def validateTransaction(transid,tList) do
-      list = :ets.lookup(:blocks,"unspentTrans")
-      if(Enum.count(list)>0
-      && !Enum.any?(list, fn {id,_}-> id==transid end)
-      && Enum.count(tList, fn {id,_}-> id==transid end) ==1) do
-
-      else
-          :false
-      end
+  def temp do
+      :ets.new(:blocks, [:bag,:named_table,:protected])
+      :ets.insert(:blocks,{"blocs",1,9})
+      :ets.insert(:blocks,{"blocs",2})
+      :ets.insert(:blocks,{"blocs",3})
+      :ets.insert(:blocks,{"hh",3})
+      IO.inspect :ets.lookup(:blocks,"blocs")
+      :ets.delete(:blocks, "blocs")
+      IO.inspect :ets.lookup(:blocks,"blocs")
+      :ets.insert(:blocks,{"blocs",1,9})
+      IO.inspect :ets.lookup(:blocks,"blocs")
   end
-
-  def randomString(length) do
-      charList = Enum.map(1..length, fn x ->
-        Enum.random(['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','0','1','2','3','4','5','6','7','8','9'])
-      end)
-      List.to_string(charList)
-  end
-
 end
