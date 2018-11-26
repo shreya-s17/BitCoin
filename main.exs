@@ -16,7 +16,5 @@ defmodule MAIN do
     TRANSACTION.transactionChain(200,transferAmt)
 
     Process.sleep(200)
-    TASKFINDER.run(2, nbits)
-
-    #IO.inspect :ets.lookup(:table,"pendingTxns")
+    TASKFINDER.run(2, nbits, 0)
   end
