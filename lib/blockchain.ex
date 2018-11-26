@@ -27,7 +27,7 @@ defmodule BLOCKCHAIN do
 
   def getLatestBlock() do
       list=:ets.lookup(:table,"Blocks")
-      {_,hash,_,_} = Enum.at(list,-1)
+      {_,_,[hash,_,_,_]} = Enum.at(list,-1)
       hash
   end
 
@@ -64,7 +64,7 @@ defmodule BLOCKCHAIN do
     list
   end
 
-  def createBlockHeader(miner, transactionList, transactionFees, minerFee, previousBlock) do
+  def createBlockHeader(miner, transactionList, transactionFees, minerFee, previousBlock,nbits) do
       #change here nultiple coinbase trans for genesis block
       transList = if(miner == NULL) do
                       createCoinBase(transactionFees)
@@ -77,8 +77,10 @@ defmodule BLOCKCHAIN do
       merkleRoot = calculateMerkleRoot(newList,0)
       version =<<1::32>>
       time =  <<System.system_time(:second)::32>>
-      nbits = calculateNBits()
-      [calculateNonce(merkleRoot,version,previousBlock,time,nbits,0),previousBlock, count, newTransList]
+      {hash,nonce} = calculateNonce(merkleRoot,version,previousBlock,time,nbits,0)
+      IO.puts("block created")
+      [hash, %{version: version, previousBlockHash: previousBlock, merkleRoot: merkleRoot, time: time, nBits: nbits, nonce: nonce},
+       count, newTransList]
   end
 
   def calculateNonce(merkleRoot,version,previousBlock,time,nbits,nonce) do
@@ -86,38 +88,27 @@ defmodule BLOCKCHAIN do
       if(String.slice(hashBlock,0..1) != "00" || String.at(hashBlock,2) =="0" || hashBlock > @difficulty_target) do
           calculateNonce(merkleRoot,version,previousBlock,time,nbits,nonce+1)
       else
-          hashBlock
+          {hashBlock,nonce}
       end
   end
 
-  def createGenesisBlock() do
-      block = createBlockHeader(NULL, [], @miningValue, 0, "0000000000000000000000000000000000000000000000000000000000000000")
+  def createGenesisBlock(nbits) do
+      block = createBlockHeader(NULL, [], @miningValue, 0, "0000000000000000000000000000000000000000000000000000000000000000",nbits)
       Enum.each(Enum.at(block,3), fn x -> :ets.insert(:table, {"unspentTxns", x}) end)
+      WALLETS.updateUnspentAmount()
       block
   end
 
-  def validateTransaction(tList) do
-     # list = :ets.lookup(:blocks,"unspentTrans")
-      #if(Enum.count(list)>0
-     # && !Enum.any?(list, fn {id,_}-> id==transid end)
-      #&& Enum.count(tList, fn {id,_}-> id==transid end) ==1) do
-
-      #else
-      #    :false
-      #end
-      :true
+  def validateHash(hash, map) do
+      hashBlock = :crypto.hash(:sha256,Map.get(map,:version) <> Map.get(map,:previousBlockHash) <> Map.get(map,:merkleRoot)
+      <> Map.get(map,:time) <> Map.get(map,:nBits) <> Map.get(map,:nonce)) |> Base.encode16
+      if(hash == hashBlock && String.slice(hashBlock,0..1) == "00"
+       && String.at(hashBlock,2) !="0" && hashBlock <= @difficulty_target) do
+          true
+      else
+          false
+      end
   end
 
-  def temp do
-      :ets.new(:blocks, [:bag,:named_table,:protected])
-      :ets.insert(:blocks,{"blocs",1,9})
-      :ets.insert(:blocks,{"blocs",2})
-      :ets.insert(:blocks,{"blocs",3})
-      :ets.insert(:blocks,{"hh",3})
-      IO.inspect :ets.lookup(:blocks,"blocs")
-      :ets.delete(:blocks, "blocs")
-      IO.inspect :ets.lookup(:blocks,"blocs")
-      :ets.insert(:blocks,{"blocs",1,9})
-      IO.inspect :ets.lookup(:blocks,"blocs")
-  end
+
 end
