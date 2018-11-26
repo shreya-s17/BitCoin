@@ -11,21 +11,25 @@ defmodule TRANSACTION do
     :outputs
   ]
 
-  def transactionChain(numTxns) do
+  def transactionChain(numTxns, transferAmt) do
     hashList = :ets.lookup(:table,"PublicKeys")
     |> Enum.map(fn {_, x}->
       x
     end)
-    recursivePropagation(numTxns, hashList)
+    recursivePropagation(numTxns, hashList, transferAmt)
   end
 
-  def recursivePropagation(numTxns, hashList) do
+  def recursivePropagation(numTxns, hashList, transferAmt) do
     if(numTxns != 0) do
-      transferAmt = Enum.random(1..24)
-      #WALLETS.updateUnspentAmount()
+      WALLETS.updateUnspentAmount()
      generateTxn(hashList, transferAmt,0)
      Process.sleep(100)
-     spawn(fn ->recursivePropagation(numTxns-1, hashList) end)
+     spawn(fn ->recursivePropagation(numTxns-1, hashList,transferAmt ) end)
+    else
+      Process.sleep(500)
+      #IO.inspect :ets.lookup(:table,"unspentTxns")
+  #IO.inspect :ets.lookup(:table,"pendingTxns")
+      System.halt()
     end
   end
 
@@ -44,7 +48,7 @@ defmodule TRANSACTION do
         [a,x,y]
       end)
       [_, _, _, amount] = Enum.at(out, 0)
-      
+
 
       {outputs,fee} = WALLETS.getOutputs(amount, transferAmt, hashList, address1)
       rawTransaction(inputtxIds, outputs, address1, fee)

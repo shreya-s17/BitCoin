@@ -5,11 +5,8 @@ defmodule TASKFINDER do
   @miningValue 25
 
 def run(no,nbits) do
-  list = :ets.lookup(:table, "unspentTxns")
-  IO.inspect list
   list = :ets.lookup(:table, "pendingTxns")
-  IO.inspect list
-  
+
   if(Enum.count(list) >0) do
     tempList = Enum.sort(list, &(Kernel.elem(&1,2) <= Kernel.elem(&2,2)))
     nlist = Enum.filter(tempList, fn x -> MINERSERVER.validateTransaction(x)==true end)
@@ -28,10 +25,8 @@ def run(no,nbits) do
     end)
     await(tasksList,no,nbits)
   end
-  if(no<10) do
   Process.sleep(500)
   run(no+1,nbits)
-  end
 end
 
 def await(tasks,no,nbits) do
@@ -49,6 +44,7 @@ def await(tasks,no,nbits) do
           if(val) do
             :ets.insert(:table,{"Blocks",no,block})
             insertUnspentTxns(Enum.at(block,3))
+            IO.inspect "block mined"
           else
             run(no,nbits)
           end
@@ -77,7 +73,7 @@ end
 def insertUnspentTxns(list) do
   tList = :ets.lookup(:table,"pendingTxns")
   :ets.delete(:table,"pendingTxns")
-  Enum.each(tList, fn x-> 
+  Enum.each(tList, fn x->
     if(!Enum.member?(list, Tuple.delete_at(x,0))) do
       {_,a,b,c} =x
     :ets.insert(:table,{"pendingTxns",a,b,c})
@@ -86,9 +82,9 @@ def insertUnspentTxns(list) do
 
   tList = :ets.lookup(:table,"unspentTxns")
   :ets.delete(:table,"unspentTxns")
-  txIdList = Enum.reduce(list, [], fn {_,_,map}, acc -> 
+  txIdList = Enum.reduce(list, [], fn {_,_,map}, acc ->
     acc ++ Map.get(map, :inputTxIds) end)
-  Enum.each(tList, fn {_,x,b,c}-> 
+  Enum.each(tList, fn {_,x,b,c}->
     if(!Enum.member?(txIdList, x)) do
     :ets.insert(:table,{"unspentTxns",x,b,c})
     end

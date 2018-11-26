@@ -1,6 +1,6 @@
 defmodule WALLETS do
     require GENSERVERS
-  
+
     def updateUnspentAmount() do
       list = :ets.lookup(:table,"unspentTxns")
       Enum.each(list, fn {_,_,fee,x} ->
@@ -11,23 +11,23 @@ defmodule WALLETS do
         opList = Map.get(x,:outputs)
         pubKeys = :ets.lookup(:table,"PublicKeys")
         pubKeys = Enum.map(pubKeys, fn {_,x}-> x end)
- 
-        Enum.each(opList, fn [pubKey,amt]-> 
+
+        Enum.each(opList, fn [pubKey,amt]->
             if(Enum.member?(pubKeys,pubKey)) do
                 GenServer.cast(String.to_atom("h_" <> pubKey), {:updateWallet, amt})
             else
-                GenServer.cast(String.to_atom("m_" <> pubKey), {:updateWallet, amt}) 
+                GenServer.cast(String.to_atom("m_" <> pubKey), {:updateWallet, amt})
             end
         end)
       end)
     end
-  
+
     def verify_signature(public_key, msg, signature) do
       sig = Base.decode16!(signature)
       pk = Base.decode16!(public_key)
       :crypto.verify(:ecdsa, :sha256, msg, sig, [pk, :secp256k1])
     end
-  
+
     def getUnspentTxns(pubKey, transferAmt) do
       list = :ets.lookup(:table,"unspentTxns")
       inputs = Enum.filter(list, fn {_,_,_,map}->
@@ -53,7 +53,7 @@ defmodule WALLETS do
             NULL
         end
     end
-  
+
     def getOutputs(amount, transferAmt, hashList, address1) do
       list = if(amount - transferAmt > 0.1 * transferAmt) do
         {[[Enum.random(hashList), transferAmt],
@@ -67,8 +67,9 @@ defmodule WALLETS do
       end
       list
     end
-  
+
     def getAllStates() do
+      IO.puts "amruta"
       list =  :ets.lookup(:table,"PublicKeys")
       |> Enum.map(fn {_, x}->
           [_,_,amt] = GenServer.call(String.to_atom("h_" <> x), {:getState})
