@@ -21,28 +21,35 @@ defmodule TRANSACTION do
 
   def recursivePropagation(numTxns, hashList) do
     if(numTxns != 0) do
-     generateTxn(hashList)
+      transferAmt = Enum.random(1..24)
+      #WALLETS.updateUnspentAmount()
+     generateTxn(hashList, transferAmt,0)
+     Process.sleep(100)
      spawn(fn ->recursivePropagation(numTxns-1, hashList) end)
     end
   end
 
-  def generateTxn(hashList) do
+  def generateTxn(hashList, transferAmt,count) do
+    if(count >10) do
+      IO.puts "Most of the transactions do not have transfer amount"
+    else
     address1 = Enum.random(hashList)
     [_,_,unspentAmt] = GenServer.call(String.to_atom("h_"<>address1),{:getState})
-    if(unspentAmt == 0) do    # infinite loop for nodes with 0 amount
-      generateTxn(hashList)
+    if(unspentAmt == 0) do       # infinite loop for nodes with 0 amount
+      generateTxn(hashList, transferAmt,count+1)
     end
-    transferAmt = Enum.random(1..24)
     out = WALLETS.getUnspentTxns(address1,transferAmt)
     if(out != NULL) do
-    [_, _, _, amount] = Enum.at(out, 0)
+      inputtxIds = Enum.map(out, fn [a,x,y,_]->
+        [a,x,y]
+      end)
+      [_, _, _, amount] = Enum.at(out, 0)
+      
 
-    inputtxIds = Enum.map(out, fn [_,x,y,_]->
-      [x,y]
-    end)
-    {outputs,fee} = WALLETS.getOutputs(amount, transferAmt, hashList, address1)
-    rawTransaction(inputtxIds, transferAmt, outputs, address1, fee)
+      {outputs,fee} = WALLETS.getOutputs(amount, transferAmt, hashList, address1)
+      rawTransaction(inputtxIds, outputs, address1, fee)
     end
+  end
   end
 
   def coinBase(output, amount) do
@@ -56,12 +63,15 @@ defmodule TRANSACTION do
     |> KEYGENERATION.hash(:sha256)
     |> KEYGENERATION.hash(:sha256)
     |> Base.encode16()
-    map = %{inputTxId: "0", inputPubKey: "0", outpoint: 0, amount: amount, outPubKey: output}
+    map = %{sig: "", inputTxIds: [], inputs: {"0",0}, outputs: tx.outputs}
     {"",transRef, 0, map}
   end
 
-  def rawTransaction(inputs, transferAmt, outputs, currNode, transFee) do
-    transRef = Enum.reduce(inputs ++ outputs, "", fn [str, int], acc ->
+  def rawTransaction(inputs, outputs, currNode, transFee) do
+    tempInputs = Enum.map(inputs, fn [_,x,y]->
+      [x,y]
+    end)
+    transRef = Enum.reduce(tempInputs ++ outputs, "", fn [str, int], acc ->
       acc <> str <> Float.to_string(int/1)
     end)
     |> KEYGENERATION.hash(:sha256)
@@ -77,8 +87,11 @@ defmodule TRANSACTION do
     <> signedHash
     <> "01"
     <> publicKey
-
-    map = %{sig: scriptSignature, inputPubKey: inputs, outPubKey: outputs}
+    inputs1 = Enum.map(inputs, fn [_,a,_]->
+      a
+    end)
+    amt = Enum.reduce(outputs,0, fn [_,a], acc->acc+ a end)
+    map = %{sig: scriptSignature, inputTxIds: inputs1, inputs: {currNode, amt+transFee}, outputs: outputs}
     :ets.insert(:table, {"pendingTxns", transRef, transFee, map})
   end
 
