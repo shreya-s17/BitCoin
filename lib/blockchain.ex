@@ -24,7 +24,7 @@ defmodule BLOCKCHAIN do
                 List.insert_at(list,i,:crypto.hash(:sha256,:crypto.hash(:sha256,first<>second)) |> Base.encode16)
             end
 
-
+            #IO.inspect list
             if(i+1>=Enum.count(list)) do
                 #IO.inspect list
                 calculateMerkleRoot(list,0)
@@ -87,7 +87,6 @@ defmodule BLOCKCHAIN do
         version =<<1::32>>
         time =  <<System.system_time(:second)::32>>
         {hash,nonce} = calculateNonce(merkleRoot,version,previousBlock,time,nbits,0)
-        #IO.puts("block created")
         [hash, %{version: version, previousBlockHash: previousBlock, merkleRoot: merkleRoot, time: time, nBits: nbits, nonce: nonce},
          count, newTransList]
     end
@@ -104,13 +103,11 @@ defmodule BLOCKCHAIN do
     def createGenesisBlock(nbits) do
         block = createBlockHeader(NULL, [], @miningValue, 0, "0000000000000000000000000000000000000000000000000000000000000000",nbits)
         Enum.each(Enum.at(block,3), fn {txid, txfee, map} -> :ets.insert(:table, {"unspentTxns", txid, txfee, map}) end)
-        #IO.inspect :ets.lookup(:table,"unspentTxns")
         WALLETS.updateUnspentAmount()
         block
     end
 
     def validateHash(hash, map) do
-      #IO.puts("herrrr #{inspect map} #{inspect hash}")
         hashBlock = :crypto.hash(:sha256,Map.get(map,:version) <> Map.get(map,:previousBlockHash) <> Map.get(map,:merkleRoot)
         <> Map.get(map,:time) <> Map.get(map,:nBits) <> <<Map.get(map,:nonce)::32>>) |> Base.encode16
         if(hash == hashBlock && String.slice(hashBlock,0..1) == "00"
@@ -121,5 +118,36 @@ defmodule BLOCKCHAIN do
         end
     end
 
+    def validateAllHash(list) do
+        Enum.all?(list, fn {_,_,block} ->
+        [hash, map, _count, _] = block
+            validateHash(hash, map)
+        end)
 
+    end
+
+    def initializeGenesisBlock(numNodes, nbits) do
+        :ets.new(:table, [:bag, :named_table,:public])
+        SSUPERVISOR.start_link(numNodes)
+        firstBlock = BLOCKCHAIN.createGenesisBlock(nbits)
+        :ets.insert(:table,{"Blocks",1,firstBlock})
+    end
+
+    def testSetup() do
+        numNodes = 8
+        nbits = BLOCKCHAIN.calculateNBits()
+        BLOCKCHAIN.initializeGenesisBlock(numNodes,nbits)
+        transferAmt = Enum.random(1..24)
+        noOfTrans = 2
+        noMiners = 2
+        Enum.each(1..noMiners, fn _-> MINERSERVER.start_link end)
+        TRANSACTION.createInitialTransactions(transferAmt, noOfTrans, nbits)
+    end
+
+    def validateMerkleRoot(list) do
+        Enum.all?(list, fn {_,_,block} ->
+            [_, map, _count, tList] = block
+            MINERSERVER.validateMerkleRoot(Map.get(map,:merkleRoot), tList)
+            end)
+    end
   end

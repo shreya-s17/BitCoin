@@ -6,18 +6,28 @@ defmodule TASKFINDER do
 
   def run(no,nbits,count) do
     list = :ets.lookup(:table, "pendingTxns")
-
+#IO.inspect Enum.count(list)
     if(Enum.count(list) >0) do
       tempList = Enum.sort(list, &(Kernel.elem(&1,2) <= Kernel.elem(&2,2)))
-      nlist = Enum.filter(tempList, fn x -> MINERSERVER.validateTransaction(x)==true end)
-      count = Enum.count(nlist)
+      nlist = Enum.map(tempList, fn {_,x,y,z} -> {x,y,z} end)
+      #IO.inspect nlist
+      removeList = MINERSERVER.validateTransaction(Enum.slice(nlist,1..-1))
+      tempList = Enum.filter(tempList, fn {_,x,y,z} -> !Enum.member?(removeList,{x,y,z}) end)
+      :ets.delete(:table,"pendingTxns")
+      Enum.each(list, fn {_,x,y,z}-> if(!Enum.member?(removeList,{x,y,z})) do
+        :ets.insert(:table,{"pendingTxns", x,y,z})
+      end
+    end)
+
+
+      count = Enum.count(tempList)
       pow = :math.pow(2,countList(0,count))
       count = if(pow==count || pow+1==count) do
                 count
               else
                 pow+1
               end
-      list = Enum.slice(nlist,0..round(count))
+      list = Enum.slice(tempList,0..round(count))
       minerFee = Enum.reduce(list,0, fn {_,_,x,_}, acc-> acc+x end)
       miners = :ets.lookup(:table,"MinerPublicKeys")
       tasksList = Enum.map(miners, fn {_,x}->
@@ -29,9 +39,6 @@ defmodule TASKFINDER do
     else
       if(count<5) do
       run(no+1,nbits, count+1)
-      else
-        #IO.inspect :ets.lookup(:table,"unspentTxns")
-    #IO.inspect :ets.lookup(:table,"pendingTxns")
       end
     end
 

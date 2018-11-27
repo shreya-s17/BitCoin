@@ -1,42 +1,48 @@
 defmodule BITCOINTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   setup_all do
-    IO.puts "Starting test cases"
+    IO.puts ""
   end
 
-  # unit test cases
-  test "Create genesis block with initial amount" do
-    IO.puts "Test case 1"
-    :ets.new(:table, [:bag, :named_table,:public])
-    numNodes = 10;
-    SSUPERVISOR.start_link(numNodes)
-    Enum.each(1..2, fn x-> MINERSERVER.start_link end)
-    firstBlock = BLOCKCHAIN.createGenesisBlock(BLOCKCHAIN.calculateNBits())
-    :ets.insert(:table,{"Blocks",1,firstBlock})
-    amounts = WALLETS.getAllStates()
-    assert !(Enum.any?(amounts, fn x-> x != 25 end))
-  end
-
-  test "Validate the block creation" do
-    IO.puts "Test case 2"
-    :ets.new(:table, [:bag, :named_table,:public])
-    numNodes = 10;
-    SSUPERVISOR.start_link(numNodes)
-    Enum.each(1..2, fn x-> MINERSERVER.start_link end)
+  test "Validate for spending > money in wallet" do
+    IO.puts "Check for spending > money in wallet"
+    Process.sleep(200)
+    numNodes = 4
+    TRANSACTION.testSetup(numNodes)
+    Enum.each(1..2, fn _-> MINERSERVER.start_link end)
     nbits = BLOCKCHAIN.calculateNBits()
-    firstBlock = BLOCKCHAIN.createGenesisBlock(nbits)
-    :ets.insert(:table,{"Blocks",1,firstBlock})
-    transferAmt = Enum.random(1..24)
-    TRANSACTION.transactionChain(2, transferAmt)
+    transferAmt = 39
+    TRANSACTION.transactionChain(1, transferAmt)
     Process.sleep(200)
     TASKFINDER.run(2, nbits, 0)
+    assert :ets.lookup(:table, "Error") == []
   end
 
-  #test "Check for spending > money in wallet" do
-   # firstBlock = BLOCKCHAIN.createGenesisBlock(BLOCKCHAIN.calculateNBits())
-   # :ets.insert(:table,{"Blocks",1,firstBlock})
-   # transferAmt = 39
-   # TRANSACTION.transactionChain(1, transferAmt)             # think for a way to pass it
-  #end
+  test "Validate null transactions" do
+    IO.puts "Validate null transactions"
+    Process.sleep(200)
+    numNodes = 4
+    TRANSACTION.testSetup(numNodes)
+    Enum.each(1..2, fn _-> MINERSERVER.start_link end)
+    nbits = BLOCKCHAIN.calculateNBits()
+    TRANSACTION.transactionChain(0, 0)
+    Process.sleep(200)
+    TASKFINDER.run(2, nbits, 0)
+    assert :ets.lookup(:table, "Error") != []
+  end
+
+  test "Validate invalid money range transactions" do
+    IO.puts "Validate invalid money range transactions"
+    Process.sleep(200)
+    numNodes = 4
+    TRANSACTION.testSetup(numNodes)
+    Enum.each(1..2, fn _-> MINERSERVER.start_link end)
+    nbits = BLOCKCHAIN.calculateNBits()
+    TRANSACTION.transactionChain(1, -5)
+    Process.sleep(200)
+    TASKFINDER.run(2, nbits, 0)
+    assert :ets.lookup(:table, "Error") != []
+  end
+
 end

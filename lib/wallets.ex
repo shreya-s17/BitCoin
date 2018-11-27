@@ -3,7 +3,7 @@ defmodule WALLETS do
 
     def updateUnspentAmount() do
       list = :ets.lookup(:table,"unspentTxns")
-      Enum.each(list, fn {_,_,fee,x} ->
+      Enum.each(list, fn {_,_,_,x} ->
         {ipKey,val} = Map.get(x,:inputs)
         if(ipKey !="0") do
           GenServer.cast(String.to_atom("h_" <> ipKey), {:updateWallet, (val)*-1})
@@ -13,11 +13,9 @@ defmodule WALLETS do
         pubKeys = Enum.map(pubKeys, fn {_,x}-> x end)
 
         Enum.each(opList, fn [pubKey,amt]->
-            if(Enum.member?(pubKeys,pubKey)) do
-                GenServer.cast(String.to_atom("h_" <> pubKey), {:updateWallet, amt})
-            else
-                GenServer.cast(String.to_atom("m_" <> pubKey), {:updateWallet, amt})
-            end
+            if(Enum.member?(pubKeys,pubKey)) do GenServer.cast(String.to_atom("h_" <> pubKey),
+              {:updateWallet, amt})
+            else GenServer.cast(String.to_atom("m_" <> pubKey), {:updateWallet, amt}) end
         end)
       end)
     end
@@ -33,7 +31,6 @@ defmodule WALLETS do
       inputs = Enum.filter(list, fn {_,_,_,map}->
         Enum.member?(Enum.map(Map.get(map,:outputs), fn [pKey,_mt]-> pKey end), pubKey)
       end)
-        #### multiple would create problem
         getInputs(inputs,0,transferAmt,0,[])
     end
 
@@ -55,12 +52,14 @@ defmodule WALLETS do
     end
 
     def getOutputs(amount, transferAmt, hashList, address1) do
-      list = if(amount - transferAmt > 0.1 * transferAmt) do
+      if(transferAmt > amount) do :ets.insert("Error",
+        {"Amount transfer is greater than present amount"}) end
+      list = if(amount - transferAmt > Float.round(0.1 * transferAmt, 4)) do
         {[[Enum.random(hashList), transferAmt],
-        [address1, amount - transferAmt - 0.1 * transferAmt]], 0.1 * transferAmt}
-      else
+        [address1, amount - transferAmt - 0.1 * transferAmt]], Float.round(0.1 * transferAmt, 4)}
+    else
         if(amount - transferAmt - 0.1 * transferAmt >=0) do
-        {[[Enum.random(hashList), transferAmt]], 0.1 * transferAmt}
+        {[[Enum.random(hashList), transferAmt]], Float.round(0.1 * transferAmt, 4)}
         else
           {[[Enum.random(hashList), transferAmt]], amount - transferAmt}
         end
@@ -69,7 +68,7 @@ defmodule WALLETS do
     end
 
     def getAllStates() do
-      IO.puts "amruta"
+      #IO.puts "amruta"
       list =  :ets.lookup(:table,"PublicKeys")
       |> Enum.map(fn {_, x}->
           [_,_,amt] = GenServer.call(String.to_atom("h_" <> x), {:getState})

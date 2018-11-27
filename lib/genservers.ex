@@ -1,7 +1,7 @@
 defmodule GENSERVERS do
   use GenServer
 
-  def start_link(args) do
+  def start_link(_) do
     [privateKey, publicKey] = KEYGENERATION.generate()
     :ets.insert(:table, {"PublicKeys", KEYGENERATION.to_public_hash(publicKey)})
     GenServer.start_link(__MODULE__,[privateKey,publicKey,0],
